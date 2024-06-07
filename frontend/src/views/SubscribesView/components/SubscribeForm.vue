@@ -26,8 +26,8 @@ const sub = ref<SubscribeType>({
   upload: 0,
   download: 0,
   total: 0,
-  expire: '',
-  updateTime: '',
+  expire: 0,
+  updateTime: 0,
   type: 'Http',
   url: '',
   website: '',
@@ -41,7 +41,7 @@ const sub = ref<SubscribeType>({
   inSecure: false,
   userAgent: '',
   healthCheck: {
-    enable: true,
+    enable: false,
     url: 'https://www.gstatic.com/generate_204',
     interval: 300
   },

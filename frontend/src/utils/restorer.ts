@@ -8,7 +8,7 @@ import {
 } from '@/constant'
 
 export const restoreProfile = (
-  config: any,
+  config: Record<string, any>,
   subID: string,
   NameIdMap: Record<string, string>,
   IdNameMap: Record<string, string>
@@ -62,7 +62,8 @@ export const restoreProfile = (
       tolerance: group.tolerance ?? 150,
       lazy: group.lazy ?? true,
       'disable-udp': group['disable-udp'] ?? false,
-      filter: group.filter ?? ''
+      filter: group.filter ?? '',
+      'exclude-filter': group['exclude-filter'] ?? ''
     }
 
     profile.proxyGroupsConfig.push(_group)
@@ -99,7 +100,6 @@ export const restoreProfile = (
           type: type,
           payload: type === 'MATCH' ? '' : payload,
           proxy: _proxy,
-          filter: '',
           'no-resolve': !!noResolve
         })
       })

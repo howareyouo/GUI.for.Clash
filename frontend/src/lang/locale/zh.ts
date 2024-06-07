@@ -149,6 +149,7 @@ export default {
       tolerance: '容差',
       url: '测速链接',
       filter: '过滤',
+      'exclude-filter': '排除',
       notFound: '部分订阅或节点已丢失，请清理',
       needToAdd: '至少引用一个订阅或节点',
       sort: '查看和排序',
@@ -417,6 +418,8 @@ export default {
     'on::subscribe': '更新订阅时',
     'on::ready': 'APP就绪后',
     'on::task': '计划任务执行时',
+    'on::install': '点击安装时',
+    'on::uninstall': '点击卸载时',
     name: '名称',
     description: '描述',
     url: '远程地址',
@@ -446,7 +449,8 @@ export default {
     update: '更新列表',
     updateSuccess: '列表更新成功',
     total: '插件数量为',
-    removeConfiguration: '是否删除插件配置？'
+    removeConfiguration: '是否删除插件配置？',
+    testRun: '运行测试'
   },
   scheduledtask: {
     name: '名称',
@@ -548,7 +552,11 @@ export default {
   },
   titlebar: {
     resetSize: '重置窗口',
-    reload: '重载界面'
+    reload: '重载界面',
+    restart: '重启程序',
+    exitApp: '退出程序',
+    waiting: '正在等待程序退出...',
+    timeout: '程序退出超时，是否强制退出？\n\n原因：插件退出超时。'
   },
   format: {
     seconds: '秒',
@@ -565,24 +573,6 @@ export default {
     year: '年',
     ago: '前',
     later: '后'
-  },
-  tray: {
-    restart: '重启',
-    restartTip: '重启程序',
-    exit: '退出',
-    exitTip: '退出程序',
-    proxyGroup: '代理组',
-    setSystemProxy: '设置系统代理',
-    clearSystemProxy: '清除系统代理',
-    tun: 'Tun模式',
-    enableTunMode: '启用TUN模式',
-    disableTunMode: '禁用TUN模式',
-    kernel: '内核管理',
-    proxy: '系统代理',
-    startKernel: '开启内核',
-    stopKernel: '关闭内核',
-    restartKernel: '重启内核',
-    plugins: '插件'
   },
   commands: {
     noMatching: '没有匹配到命令'

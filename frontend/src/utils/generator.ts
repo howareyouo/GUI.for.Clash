@@ -1,7 +1,7 @@
 import { parse, stringify } from 'yaml'
 
 import { Readfile, Writefile } from '@/bridge'
-import { deepClone, ignoredError, APP_TITLE } from '@/utils'
+import { deepClone, APP_TITLE } from '@/utils'
 import { KernelConfigFilePath, ProxyGroup } from '@/constant/kernel'
 import { type ProfileType, useSubscribesStore, useRulesetsStore, usePluginsStore } from '@/stores'
 
@@ -114,10 +114,11 @@ export const generateProxyGroup = (
     tolerance,
     lazy,
     'disable-udp': disableUDP,
-    filter
+    filter,
+    'exclude-filter': ExcludeFilter
   } = proxyGruoup
 
-  const group: any = { name, type, filter }
+  const group: any = { name, type, filter, 'exclude-filter': ExcludeFilter }
 
   if (use.length !== 0) {
     group.use = use
@@ -282,12 +283,4 @@ export const generateConfigFile = async (profile: ProfileType) => {
   const config = await generateConfig(profile)
 
   await Writefile(KernelConfigFilePath, header + stringify(config))
-}
-
-export const addToRuleSet = async (ruleset: 'direct' | 'reject' | 'proxy', payload: string) => {
-  const path = `data/rulesets/${ruleset}.yaml`
-  const content = (await ignoredError(Readfile, path)) || '{}'
-  const { payload: p = [] } = parse(content)
-  p.unshift(payload)
-  await Writefile(path, stringify({ payload: [...new Set(p)] }))
 }

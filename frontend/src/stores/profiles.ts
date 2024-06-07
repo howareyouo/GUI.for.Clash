@@ -106,6 +106,7 @@ export type ProfileType = {
     lazy: boolean
     'disable-udp': boolean
     filter: string
+    'exclude-filter': string
   }[]
   rulesConfig: {
     id: string
@@ -113,7 +114,6 @@ export type ProfileType = {
     payload: string
     proxy: string
     'no-resolve': boolean
-    filter: string
   }[]
 }
 

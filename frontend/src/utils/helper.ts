@@ -1,8 +1,11 @@
+import { parse, stringify } from 'yaml'
+
 import { ProxyGroupType } from '@/constant'
+import { useConfirm, useMessage } from '@/hooks'
 import { ignoredError, APP_TITLE } from '@/utils'
 import { deleteConnection, getConnections, useProxy } from '@/api/kernel'
+import { AbsolutePath, Exec, ExitApp, Readfile, Writefile } from '@/bridge'
 import { useAppSettingsStore, useEnvStore, useKernelApiStore, usePluginsStore } from '@/stores'
-import { Exec, ExitApp, WindowFullscreen, WindowIsFullscreen, WindowUnfullscreen } from '@/bridge'
 
 // Permissions Helper
 export const SwitchPermissions = async (enable: boolean) => {
@@ -368,11 +371,21 @@ export const handleChangeMode = async (mode: 'direct' | 'global' | 'rule') => {
   await Promise.all(promises)
 }
 
+export const addToRuleSet = async (ruleset: 'direct' | 'reject' | 'proxy', payload: string) => {
+  const path = `data/rulesets/${ruleset}.yaml`
+  const content = (await ignoredError(Readfile, path)) || '{}'
+  const { payload: p = [] } = parse(content)
+  p.unshift(payload)
+  await Writefile(path, stringify({ payload: [...new Set(p)] }))
+}
+
 export const exitApp = async () => {
   const envStore = useEnvStore()
   const pluginsStore = usePluginsStore()
   const appSettings = useAppSettingsStore()
   const kernelApiStore = useKernelApiStore()
+  const { message } = useMessage()
+  const { confirm } = useConfirm()
 
   if (appSettings.app.kernel.running && appSettings.app.closeKernelOnExit) {
     await kernelApiStore.stopKernel()
@@ -381,13 +394,17 @@ export const exitApp = async () => {
     }
   }
 
-  setTimeout(ExitApp, 3_000)
+  const { destroy, error } = message.info('titlebar.waiting', 10 * 60 * 1000)
+
+  setTimeout(async () => {
+    const ok = await confirm('Tips', 'titlebar.timeout').catch(() => destroy())
+    ok && ExitApp()
+  }, 5_000)
 
   try {
     await pluginsStore.onShutdownTrigger()
-  } catch (error: any) {
-    window.Plugins.message.error(error)
+    ExitApp()
+  } catch (err: any) {
+    error(err)
   }
-
-  ExitApp()
 }

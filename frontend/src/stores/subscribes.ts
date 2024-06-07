@@ -12,7 +12,9 @@ import {
   getUserAgent,
   restoreProfile,
   ignoredError,
-  omitArray
+  omitArray,
+  isValidBase64,
+  formatDate
 } from '@/utils'
 
 export type SubscribeType = {
@@ -22,8 +24,8 @@ export type SubscribeType = {
   upload: number
   download: number
   total: number
-  expire: string
-  updateTime: string
+  expire: number
+  updateTime: number
   type: 'Http' | 'File'
   url: string
   website: string
@@ -78,8 +80,8 @@ export const useSubscribesStore = defineStore('subscribes', () => {
       upload: 0,
       download: 0,
       total: 0,
-      expire: '',
-      updateTime: '',
+      expire: 0,
+      updateTime: 0,
       type: 'Http',
       url: url,
       website: '',
@@ -126,7 +128,8 @@ export const useSubscribesStore = defineStore('subscribes', () => {
   }
 
   const _doUpdateSub = async (s: SubscribeType) => {
-    const pattern = /upload=(\d*);\s*download=(\d*);\s*total=(\d*);\s*expire=(\d*)/
+    const pattern =
+      /upload=(-?)([E+.\d]+);\s*download=(-?)([E+.\d]+);\s*total=([E+.\d]+);\s*expire=(\d*)/
     let userInfo = 'upload=0; download=0; total=0; expire=0'
     let body = ''
     let proxies: Record<string, any>[] = []
@@ -147,55 +150,61 @@ export const useSubscribesStore = defineStore('subscribes', () => {
       body = b
     }
 
-    if (!isValidSubYAML(body)) {
-      throw 'Not a valid subscription data'
-    }
-
-    const pluginStore = usePluginsStore()
-
-    const config = parse(body)
-
-    proxies = (config.proxies as Record<string, any>[]).filter((v) => {
-      const flag1 = s.include ? new RegExp(s.include).test(v.name) : true
-      const flag2 = s.exclude ? !new RegExp(s.exclude).test(v.name) : true
-      const flag3 = s.includeProtocol ? new RegExp(s.includeProtocol).test(v.type) : true
-      const flag4 = s.excludeProtocol ? !new RegExp(s.excludeProtocol).test(v.type) : true
-      return flag1 && flag2 && flag3 && flag4
-    })
+    let config: Record<string, any> | undefined
+    let haveRules = false
 
     const NameIdMap: Record<string, string> = {}
     const IdNameMap: Record<string, string> = {}
 
+    if (isValidSubYAML(body)) {
+      config = parse(body) as Record<string, any>
+      proxies = config.proxies
+      haveRules = !!config.rules
+      if (haveRules) {
+        proxies.forEach((proxy, index) => {
+          proxy.__tmp__id__ = index
+          NameIdMap[proxy.name] = proxy.__tmp__id__
+        })
+      }
+    } else if (isValidBase64(body)) {
+      proxies = [{ base64: body }]
+    } else {
+      throw 'Not a valid subscription data'
+    }
+
+    const pluginStore = usePluginsStore()
+    proxies = await pluginStore.onSubscribeTrigger(proxies, s)
+
+    if (proxies.some((proxy) => proxy.base64)) {
+      throw 'You need to install the [节点转换] plugin first'
+    }
+
+    proxies = proxies.filter((v) => {
+      const flag1 = s.include ? new RegExp(s.include, 'i').test(v.name) : true
+      const flag2 = s.exclude ? !new RegExp(s.exclude, 'i').test(v.name) : true
+      const flag3 = s.includeProtocol ? new RegExp(s.includeProtocol, 'i').test(v.type) : true
+      const flag4 = s.excludeProtocol ? !new RegExp(s.excludeProtocol, 'i').test(v.type) : true
+      return flag1 && flag2 && flag3 && flag4
+    })
+
+    if (s.proxyPrefix) {
+      proxies.forEach((v) => {
+        v.name = v.name.startsWith(s.proxyPrefix) ? v.name : s.proxyPrefix + v.name
+      })
+    }
+
     proxies.forEach((proxy: any) => {
       // Keep the original ID value of the proxy unchanged
       proxy.__id__ = s.proxies.find((v) => v.name === proxy.name)?.id || sampleID()
-      NameIdMap[proxy.name] = proxy.__id__
-
-      if (s.proxyPrefix) {
-        proxy.name = proxy.name.startsWith(s.proxyPrefix) ? proxy.name : s.proxyPrefix + proxy.name
-      }
     })
 
-    proxies = await pluginStore.onSubscribeTrigger(proxies, s)
-
-    proxies.forEach((proxy: any) => {
-      IdNameMap[proxy.__id__] = proxy.name
-    })
-
-    const match = userInfo.match(pattern) || [0, 0, 0, 0, 0]
-
-    const [, upload = 0, download = 0, total = 0, expire = 0] = match
-    s.upload = Number(upload)
-    s.download = Number(download)
-    s.total = Number(total)
-    s.expire = Number(expire) ? new Date(Number(expire) * 1000).toLocaleString() : ''
-    s.updateTime = new Date().toLocaleString()
-    s.proxies = proxies.map(({ name, type, __id__ }) => ({ id: __id__, name, type }))
-
-    if (s.useInternal) {
+    if (s.useInternal && haveRules) {
+      proxies.forEach((proxy: any) => {
+        IdNameMap[proxy.__tmp__id__] = proxy.name
+      })
       const profilesStore = useProfilesStore()
       const profile = profilesStore.getProfileById(s.id)
-      const _profile = restoreProfile(config, s.id, NameIdMap, IdNameMap)
+      const _profile = restoreProfile(config!, s.id, NameIdMap, IdNameMap)
       if (profile) {
         _profile.name = profile.name
         _profile.advancedConfig.secret = profile.advancedConfig.secret
@@ -206,8 +215,18 @@ export const useSubscribesStore = defineStore('subscribes', () => {
       }
     }
 
+    const match = userInfo.match(pattern) || [0, 0, 0, 0, 0]
+
+    const [, , upload = 0, , download = 0, total = 0, expire = 0] = match
+    s.upload = Number(upload)
+    s.download = Number(download)
+    s.total = Number(total)
+    s.expire = Number(expire) * 1000
+    s.updateTime = Date.now()
+    s.proxies = proxies.map(({ name, type, __id__ }) => ({ id: __id__, name, type }))
+
     if (s.type === 'Http' || s.url !== s.path) {
-      proxies.forEach((proxy) => delete proxy.__id__)
+      proxies = omitArray(proxies, ['__id__', '__tmp__id__'])
       await Writefile(s.path, stringify({ proxies }))
     }
   }
